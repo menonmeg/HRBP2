@@ -14,6 +14,8 @@ ax.set_xlabel('X axis (mm)')
 ax.set_ylabel('Y axis (mm)')
 ax.set_zlabel('Z axis (mm)')
 
+#Paper Coordinates, set these based on 4x4 matrix 
+
 paper_x = [-101.6,101.6,101.6,-101.6,-101.6]
 paper_y = [304.8,304.8,304.8,304.8,304.8]
 paper_z = [0.0,0.0,279.4,279.4,0.0]
