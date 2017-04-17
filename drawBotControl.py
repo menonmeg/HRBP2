@@ -16,7 +16,7 @@ from joy import *
 import time
 
 SERVO_NAMES = {
-    0x51:'MX1', 0x45:'MX2', 0x4E:'MX3', 0x09:'MX4',0x34: 'MX5'
+    0x51:'MX1', 0x45:'MX2', 0x4E:'MX3', 0x09:'MX4',0x34: 'MX5', 0x4F: 'M6'
 }
 MOVE_TORQUE = 0.2
 MOVE_DUR = 0.25
@@ -28,7 +28,15 @@ TURN_DUR = 0.2
 X_TORQUE = 0.95
 X_DUR = 0.5
 
-SERVO_POS = 500
+Y_TORQUE = 0.2
+Y_DUR = 0.2
+
+SERVO_POS = 200
+
+X_DUR_SQUARE = 70
+Y_DUR_SQUARE = 5.0
+
+
 
 class MovePlan( Plan ):
     """
@@ -79,18 +87,54 @@ class RotatePlan( Plan ):
         # Set torque to move wheels. Motors are oriented to move in opposite
         # directions with same torque
         self.r.lwheel.set_torque(self.torque)
-        self.r.rwheel.set_torque(self.torque) 
-	self.r.xmotor.set_torque(0)
-	self.r.lservo.set_torque(0)
-	self.r.rservo.set_torque(0)     
+        self.r.rwheel.set_torque(self.torque)   
 
         yield self.forDuration(self.dur)
 
 	self.r.lwheel.set_torque(0)
         self.r.rwheel.set_torque(0)
-	self.r.xmotor.set_torque(0)
-	self.r.lservo.set_torque(0)
-	self.r.rservo.set_torque(0)
+class AutoPlan( Plan ):
+    """
+    Plant that rotates buggy by setting torque on wheels for fixed duration.
+
+    Torque and direction are public so they can be modified to change direction
+    and speed of rotation. To rotate buggy in opposite direction make torque a
+    negative number.
+    """
+
+    def __init__(self,app):
+        Plan.__init__(self,app)
+        self.r = self.app.robot.at
+        self.xtorque = X_TORQUE
+	self.durX = X_DUR_SQUARE
+	self.ytorque = Y_TORQUE
+	self.durY = Y_DUR_SQUARE
+
+    def behavior(self):
+       
+        # Set torque to adjust turret
+        self.r.xmotor.set_torque(self.xtorque)        
+	
+	yield self.forDuration(self.durX)
+
+	self.r.xmotor.set_torque(0) 
+	self.r.ymotor.set_torque(self.ytorque) 
+	
+	yield self.forDuration(self.durY)
+
+	self.r.ymotor.set_torque(0) 
+	self.r.xmotor.set_torque(-1*self.xtorque)
+
+	yield self.forDuration(self.durX)
+
+	self.r.xmotor.set_torque(0) 
+	self.r.ymotor.set_torque(-1*self.ytorque) 
+	
+	yield self.forDuration(self.durY)
+
+	self.r.xmotor.set_torque(0) 
+	self.r.ymotor.set_torque(0) 
+	
 
 class XPlan( Plan ):
     """
@@ -114,8 +158,31 @@ class XPlan( Plan ):
 	
 	yield self.forDuration(self.dur)
 
-	self.r.xmotor.set_torque(self.xtorque)
+	self.r.xmotor.set_torque(0) 
 
+class YPlan( Plan ):
+    """
+    Plant that rotates buggy by setting torque on wheels for fixed duration.
+
+    Torque and direction are public so they can be modified to change direction
+    and speed of rotation. To rotate buggy in opposite direction make torque a
+    negative number.
+    """
+
+    def __init__(self,app):
+        Plan.__init__(self,app)
+        self.r = self.app.robot.at
+        self.ytorque = Y_TORQUE
+	self.dur = Y_DUR
+
+    def behavior(self):
+       
+        # Set torque to adjust turret
+        self.r.ymotor.set_torque(self.ytorque)        
+	
+	yield self.forDuration(self.dur)
+
+	self.r.ymotor.set_torque(0) 
 
 class ServoPlan( Plan ):
     """
@@ -144,27 +211,31 @@ class ServoPlan( Plan ):
 
 class StopPlan( Plan ):
     """
-    Plan that moves buggy forward or backward by setting equal torque on wheels
-    for a fixed duration of time.
+    Plant that rotates buggy by setting torque on wheels for fixed duration.
 
-    Torque and Duration are public variables that can be modified on the fly.
-    To move buggy backwards set torque to a negative value.
+    Torque and direction are public so they can be modified to change direction
+    and speed of rotation. To rotate buggy in opposite direction make torque a
+    negative number.
     """
 
     def __init__(self,app):
-	Plan.__init__(self,app)
+        Plan.__init__(self,app)
         self.r = self.app.robot.at
-        self.torque = SERVO_POS
-        self.dur = MOVE_DUR
+	self.dur = MOVE_DUR
 
+    def behavior(self):      
 
-    def behavior(self):
-        # Set torque to move wheels. Right wheel must be opposite of left wheel
-        # due to orientation of motors
-
-	self.r.xmotor.set_torque(0)
+	self.r.ymotor.set_torque(0) 
+	self.r.xmotor.set_torque(0) 
+	self.r.lwheel.set_torque(0)
+        self.r.rwheel.set_torque(0)
 
 	yield self.forDuration(self.dur)
+
+	self.r.ymotor.set_torque(0) 
+	self.r.xmotor.set_torque(0) 
+	self.r.lwheel.set_torque(0)
+        self.r.rwheel.set_torque(0)
 
 
 
@@ -181,8 +252,10 @@ class DrawingBotApp( JoyApp ):
         self.moveP = MovePlan(self)
         self.turnP = RotatePlan(self)
 	self.xP = XPlan(self)
+	self.yP = YPlan(self)
 	self.servoP = ServoPlan(self)
 	self.stopP = StopPlan(self)
+	self.autoP = AutoPlan(self)
 
     def onEvent(self, evt):
         if evt.type != KEYDOWN:
@@ -217,6 +290,14 @@ class DrawingBotApp( JoyApp ):
                 self.xP.xtorque = -1 * X_TORQUE 
                 self.xP.start()
                 return progress("(say) adjusted x")
+	    elif evt.key == K_k:
+                self.yP.ytorque = Y_TORQUE 
+                self.yP.start()
+                return progress("(say) adjusted y")
+            elif evt.key == K_j:
+                self.yP.ytorque = -1 * Y_TORQUE 
+                self.yP.start()
+                return progress("(say) adjusted y")
 	    elif evt.key == K_z:
 		self.servoP.pos = SERVO_POS
 		self.servoP.start()
@@ -224,13 +305,16 @@ class DrawingBotApp( JoyApp ):
 		self.servoP.pos = -1*SERVO_POS
 		self.servoP.start()
 	    elif evt.key == K_SPACE:
-		self.stopP = 0
 		self.stopP.start()
+	    elif evt.key == K_a:
+		self.autoP.start()
+		return progress("(say) adjusted y")
+	
 	
    
 
 #runs on main
 if __name__=="__main__":
     import sys
-    app=DrawingBotApp(robot = dict(count = 5))
+    app=DrawingBotApp(robot = dict(count = 6))
     app.run()
